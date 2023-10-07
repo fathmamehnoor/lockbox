@@ -51,47 +51,22 @@ void add_user_from_file(struct user **head2, char *username, char *password)
     *head2 = new_user;
 }
 
+void load_data(struct user **head2){
 
-
-
-void add_user(struct user **head2){
+    char username[100];
     char password[100];
-    struct user* new = (struct user*)malloc(sizeof(struct user));
-    if(new == NULL){
-        perror("Memory allocation error: Unable to create a new user.\n");
-        exit(EXIT_FAILURE);
-    }
-    printf("Username:\n");
-    scanf("%s", new->username);
-    printf("Password:\n");
-    scanf("%s",password);
-
-    const char *salt = "random_salt";
-    const int iterations = 10;    // Number of iterations
-    const int memory = 65536;     // Amount of memory (in KiB)
-    const int threads = 4;
-    const size_t desired_hash_length = 16; // Change this to your desired hash length in bytes
-
-new->password_hash = (uint8_t *)malloc(desired_hash_length);
-if (new->password_hash == NULL) {
-    perror("Memory allocation error: Unable to allocate memory for the password hash.\n");
-    exit(EXIT_FAILURE);
-}
-
-
-   int result = argon2_hash(iterations, memory, threads, password, strlen(password), salt, 
-                        strlen(salt), new->password_hash, desired_hash_length, NULL,
-                        0, Argon2_id, ARGON2_VERSION_13);
-
-    if (result != ARGON2_OK) {
-        fprintf(stderr, "Error hashing password: %s\n", argon2_error_message(result));
+    FILE *fp = fopen("users.txt", "r");
+    if(fp == NULL){
+        perror("Unable to open file for reading.\n");
         exit(EXIT_FAILURE);
     }
 
+    while(fscanf(fp, "%s %s\n", username, password)==1){
+        add_user_from_file(head2, username, password);
+    }
 
-    new->next = *head2;
-    *head2 = new;
-    printf("New user added.\n");
+    fclose(fp);
+
 }
 
 void save_data_to_file(struct user **head2){
@@ -112,21 +87,49 @@ void save_data_to_file(struct user **head2){
 }
 
 
-void load_data(struct user **head2){
 
-    char username[100];
+
+void add_user(struct user **head2){
+
     char password[100];
-    FILE *fp = fopen("users.txt", "r");
-    if(fp == NULL){
-        perror("Unable to open file for reading.\n");
+    struct user* new = (struct user*)malloc(sizeof(struct user));
+    if(new == NULL){
+        perror("Memory allocation error: Unable to create a new user.\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Username:\n");
+    scanf("%s", new->username);
+    printf("Password:\n");
+    scanf("%s",password);
+
+    const char *salt = "random_salt";
+    const int iterations = 10;    // Number of iterations
+    const int memory = 65536;     // Amount of memory (in KiB)
+    const int threads = 4;
+    const size_t desired_hash_length = 16; // Change this to your desired hash length in bytes
+
+    new->password_hash = (uint8_t *)malloc(desired_hash_length);
+    if (new->password_hash == NULL){
+        perror("Memory allocation error: Unable to allocate memory for the password hash.\n");
         exit(EXIT_FAILURE);
     }
 
-    while(fscanf(fp, "%s %s\n", username, password)==2){
-        add_user_from_file(head2, username, password);
+
+   int result = argon2_hash(iterations, memory, threads, password, strlen(password), salt, 
+                        strlen(salt), new->password_hash, desired_hash_length, NULL,
+                        0, Argon2_id, ARGON2_VERSION_13);
+
+    if (result != ARGON2_OK) {
+        fprintf(stderr, "Error hashing password: %s\n", argon2_error_message(result));
+        exit(EXIT_FAILURE);
     }
 
-    fclose(fp);
+
+    new->next = *head2;
+    *head2 = new;
+    printf("New user added.\n");
+    save_data_to_file(head2);
+    load_data(head2);
 
 }
 
@@ -145,6 +148,7 @@ void retrieve_password(struct p_entry** head, const char* website){
 }
 
 void update_password(struct p_entry** head, const char* website){
+
     char new_password[100];
     struct p_entry *current = *head;
     while(current != NULL){
@@ -160,6 +164,7 @@ void update_password(struct p_entry** head, const char* website){
     }
 
     printf("Error: Password not been added!\n");
+
 }
 
 
@@ -186,7 +191,7 @@ void delete_password(struct p_entry **head, const char* website){
 
     free(current);
 
-} 
+}
 
 void list_password(struct p_entry **head){
 
@@ -201,6 +206,7 @@ void list_password(struct p_entry **head){
 }
 
 int check_user(const char *username, struct user **head2){
+
     struct user *current = *head2;
 
     while(current != NULL){
@@ -210,9 +216,11 @@ int check_user(const char *username, struct user **head2){
         current = current->next;
     }
     return 0;
+
 }
 
 int verify_password( char *input_password, char *username, struct user **head2) {
+
     struct user *current = *head2;
     const size_t desired_hash_length = 16;
     while(current != NULL){
@@ -239,10 +247,12 @@ int verify_password( char *input_password, char *username, struct user **head2) 
           }
          current = current->next;
     }
+
 }
 
 
 void p_user(){
+
     int choice;
     char account[100];
     do
@@ -286,13 +296,14 @@ void p_user(){
                 printf("Enter a valid choice.\n");
         }
     }while(choice!=6);
+
 }
 
 int main(){
+
     int choice;
     char username[100];
     char password[100];
-    load_data(&head2);
     do{
     printf("1. Login\n2. Add Account\n3. Exit\n");
     printf("Enter a choice\n");
@@ -319,7 +330,6 @@ int main(){
             break;
         case 2:
             add_user(&head2);
-            save_data_to_file(&head2);
             break;
         case 3:
             exit(0);
@@ -328,4 +338,5 @@ int main(){
 
      }
     }while(choice!=3);
+
 }
