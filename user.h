@@ -3,20 +3,24 @@
 #include <stdlib.h>
 #include <argon2.h>
 
-/* Structure for each user */
-struct user{
-    char username[100];
-    uint8_t *password_hash;
-    struct user *next;
-};
-
-struct user* head2 = NULL;
 #ifndef USER_H
 #define USER_H
-void save_data_to_file(struct user **head2);
-void add_user_from_file(struct user **head2, char *username, char *password);
-void load_data(struct user **head2);
-void add_user(struct user **head2);
-int check_user(const char *username, struct user **head2);
-int verify_password( char *input_password, char *username, struct user **head2);
+
+#define MAX_USERS 10
+#define MAX_USERNAME_LENGTH 200
+#define MAX_PASSWORD_LENGTH 200
+
+/* Structure for each user */
+struct User {
+    char username[MAX_USERNAME_LENGTH];
+    char password[MAX_PASSWORD_LENGTH];
+    char password_hash[MAX_PASSWORD_LENGTH];
+};
+
+int register_user();
+int verify_user(char *password, char *base_password);
+int authenticate_user();
+int load_users_from_file();
+int save_users_to_file();
+int load_users_from_file();
 #endif

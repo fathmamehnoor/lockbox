@@ -2,159 +2,161 @@
 #include <string.h>
 #include <stdlib.h>
 #include <argon2.h>
+#include <inttypes.h>
+#include <sodium.h>
+#include "user.h"
 
+struct User users[MAX_USERS];
+int userCount = 0;
 
-/* Structure for password entry for each user */
-struct p_entry{
-    char account[100];
-    char password[100];
-    struct p_entry *next;
-};
-
-struct p_entry* head = NULL;
-/* Function to save data form linked list to file */
-void save_data_to_file(struct user **head2){
-
-    FILE *fp = fopen("users.txt","w");
-    if(fp == NULL){
-        perror("Unable to open file to store data.\n");
-        exit(EXIT_FAILURE);
+int register_user() {
+    if (userCount >= MAX_USERS) {
+        printf("User limit reached. Cannot register more users.\n");
+        return 0;
     }
 
-    struct user *current = *head2;
-    while(current!=NULL){
-        fprintf(fp, "%s %s\n", current->username, current->password_hash);
-        current = current->next;
+    char username[MAX_USERNAME_LENGTH];
+    char password[MAX_PASSWORD_LENGTH];
+    char password_hash[MAX_PASSWORD_LENGTH];
+
+    printf("Enter a username: ");
+    scanf("%s", username);
+
+    // Check if the username is already taken
+    for (int i = 0; i < userCount; i++) {
+        if (strcmp(username, users[i].username) == 0) {
+            printf("Username already exists. Please choose another.\n");
+            return 0;
+        }
     }
 
-    fclose(fp);
-}
+    printf("Enter a password: ");
+    scanf("%s", password);
 
-/* Function to add user to linked list from file */
-void add_user_from_file(struct user **head2, char *username, char *password)
-{
-    struct user* new_user = (struct user*)malloc(sizeof(struct user));
-    if( new_user == NULL)
-    {
-    perror("Memory allocation error!\n");
-    exit(EXIT_FAILURE);
-    }
-
-    strcpy(new_user->username, username);
-    strcpy(new_user->password_hash, password);
-
-    new_user->next = *head2;
-    *head2 = new_user;
-}
-
-/* Function to load data from file to linked list */
-void load_data(struct user **head2){
-
-    char username[100];
-    char password[100];
-    FILE *fp = fopen("users.txt", "r");
-    if(fp == NULL){
-        perror("Unable to open file for reading.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    while(fscanf(fp, "%s %s\n", username, password)==1){
-        add_user_from_file(head2, username, password);
-    }
-
-    fclose(fp);
-
-}
-
-/* Function to add users */
-void add_user(struct user **head2){
-
-    char password[100];
-    struct user* new = (struct user*)malloc(sizeof(struct user));
-    if(new == NULL){
-        perror("Memory allocation error: Unable to create a new user.\n");
-        exit(EXIT_FAILURE);
-    }
-    printf("Username:\n");
-    scanf("%s", new->username);
-    printf("Password:\n");
-    scanf("%s",password);
+    // Store the new user's data
+    strcpy(users[userCount].username, username);
 
     const char *salt = "random_salt";
-    const int iterations = 10;    // Number of iterations
-    const int memory = 65536;     // Amount of memory (in KiB)
+    const int iterations = 10;
+    const int memory = 65536;
     const int threads = 4;
-    const size_t desired_hash_length = 16; // Change this to your desired hash length in bytes
+    const size_t desired_hash_length = 16;
 
-    new->password_hash = (uint8_t *)malloc(desired_hash_length);
-    if (new->password_hash == NULL){
-        perror("Memory allocation error: Unable to allocate memory for the password hash.\n");
-        exit(EXIT_FAILURE);
-    }
-
-
-   int result = argon2_hash(iterations, memory, threads, password, strlen(password), salt, 
-                        strlen(salt), new->password_hash, desired_hash_length, NULL,
-                        0, Argon2_id, ARGON2_VERSION_13);
+    int result = argon2_hash(iterations, memory, threads, password, strlen(password), salt, 
+                            strlen(salt), password_hash, desired_hash_length, NULL,
+                            0, Argon2_id, ARGON2_VERSION_13);
 
     if (result != ARGON2_OK) {
         fprintf(stderr, "Error hashing password: %s\n", argon2_error_message(result));
         exit(EXIT_FAILURE);
     }
 
+    // Encode the password hash as Base64
+    size_t base64Length = sodium_base64_encoded_len(desired_hash_length, sodium_base64_VARIANT_ORIGINAL);
+    char base64Hash[base64Length];
 
-    new->next = *head2;
-    *head2 = new;
-    printf("New user added.\n");
-    save_data_to_file(head2);
-    load_data(head2);
-
-}
-
-
-/* Function to check if user has been added */
-int check_user(const char *username, struct user **head2){
-
-    struct user *current = *head2;
-
-    while(current != NULL){
-        if( strcmp(username, current->username) == 0 ){
-            return 1; // Found a matching username
-        }
-        current = current->next;
+    if (sodium_bin2base64(base64Hash, base64Length, password_hash, desired_hash_length, sodium_base64_VARIANT_ORIGINAL) == NULL) {
+        perror("Base64 encoding error.\n");
+        exit(EXIT_FAILURE);
     }
-    return 0;
 
+    strcpy(users[userCount].password_hash, base64Hash);
+    userCount++;
+
+    printf("Registration successful.\n");
+    return 0;  // Reset loggedIn to 0 after registration
 }
 
-/* Function to verify password of the user */
-int verify_password( char *input_password, char *username, struct user **head2) {
+int verify_user(char *password, char *base_password){
 
-    struct user *current = *head2;
+    char password_hash[MAX_PASSWORD_LENGTH];
+
+    const char *salt = "random_salt";
+    const int iterations = 10;
+    const int memory = 65536;
+    const int threads = 4;
     const size_t desired_hash_length = 16;
-    while(current != NULL){
-         if( strcmp(username, current->username)==0 ){
-             // Hash the user input using the same Argon2 parameters as during storage
-            char hash[desired_hash_length];
-            const char *salt = "random_salt"; // Use the same salt
-            const int iterations = 10;        // Use the same number of iterations
-            const int memory = 65536;         // Use the same memory size
-            const int threads = 4;            // Use the same number of threads
 
-            int result = argon2_hash(iterations, memory, threads, input_password, strlen(input_password), salt,
-                strlen(salt), hash, desired_hash_length, NULL, 0, Argon2_id, ARGON2_VERSION_13);
-            if (result != ARGON2_OK) {
-                fprintf(stderr, "Error hashing input password: %s\n", argon2_error_message(result));
-                return 0; // Password verification failed
-            }
-            // Compare the computed hash with the stored hashed password
-            if (memcmp(hash, current->password_hash, desired_hash_length) == 0) {
-                return 1; // Passwords match; grant access
-            } else {
-                return 0; // Passwords do not match; deny access
-            }
-          }
-         current = current->next;
+     int result = argon2_hash(iterations, memory, threads, password, strlen(password), salt, 
+                            strlen(salt), password_hash, desired_hash_length, NULL,
+                            0, Argon2_id, ARGON2_VERSION_13);
+
+    if (result != ARGON2_OK) {
+        fprintf(stderr, "Error hashing password: %s\n", argon2_error_message(result));
+        exit(EXIT_FAILURE);
     }
 
+    size_t base64Length = sodium_base64_encoded_len(desired_hash_length, sodium_base64_VARIANT_ORIGINAL);
+    char base64Hash[base64Length];
+
+    if (sodium_bin2base64(base64Hash, base64Length, password_hash, desired_hash_length, sodium_base64_VARIANT_ORIGINAL) == NULL) {
+        perror("Base64 encoding error.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (strcmp(base_password, base64Hash) == 0) {
+        return 1;  // Passwords match
+    } else {
+        return 0;  // Passwords do not match
+    }
+}
+
+int authenticate_user() {
+    char username[MAX_USERNAME_LENGTH];
+    char password[MAX_PASSWORD_LENGTH];
+
+    if (userCount == 0) {
+        printf("No users registered. Please register first.\n");
+        return 0;
+    }
+
+    printf("Username: ");
+    scanf("%s", username);
+
+    printf("Password: ");
+    scanf("%s", password);
+
+    for (int i = 0; i < userCount; i++) {
+        if (strcmp(username, users[i].username) == 0) {
+            if (verify_user(password, users[i].password) == 1){
+                printf("Login successful. Welcome, %s!\n", users[i].username);
+                return 1;
+            } else {
+                printf("Incorrect password.\n");
+                return 0;
+            }
+        }
+    }
+
+    printf("User not found.\n");
+    return 0;
+}
+
+
+int load_users_from_file() {
+    FILE *file = fopen("users.txt", "r");
+    if (file == NULL) {
+        return 0;
+    }
+
+    while (fscanf(file, "%s %s", users[userCount].username, users[userCount].password) == 2) {
+        userCount++;
+    }
+
+    fclose(file);
+    return 1;
+}
+
+int save_users_to_file() {
+    FILE *file = fopen("users.txt", "w");
+    if (file == NULL) {
+        return 0;
+    }
+
+    for (int i = 0; i < userCount; i++) {
+        fprintf(file, "%s %s\n", users[i].username, users[i].password_hash);
+    }
+
+    fclose(file);
+    return 1;
 }
