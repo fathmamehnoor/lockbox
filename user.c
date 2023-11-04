@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <sodium.h>
 #include "user.h"
+#include "entries.h"
 
 struct User users[MAX_USERS];
 int userCount = 0;
@@ -97,6 +98,7 @@ int verify_user(char *password, char *base_password){
     if (strcmp(base_password, base64Hash) == 0) {
         return 1;  // Passwords match
     } else {
+        printf("no match/n");
         return 0;  // Passwords do not match
     }
 }
@@ -118,8 +120,9 @@ int authenticate_user() {
 
     for (int i = 0; i < userCount; i++) {
         if (strcmp(username, users[i].username) == 0) {
-            if (verify_user(password, users[i].password) == 1){
+            if (verify_user(password, users[i].password_hash) == 1){
                 printf("Login successful. Welcome, %s!\n", users[i].username);
+                p_user();
                 return 1;
             } else {
                 printf("Incorrect password.\n");
@@ -139,7 +142,7 @@ int load_users_from_file() {
         return 0;
     }
 
-    while (fscanf(file, "%s %s", users[userCount].username, users[userCount].password) == 2) {
+    while (fscanf(file, "%s %s", users[userCount].username, users[userCount].password_hash) == 2) {
         userCount++;
     }
 

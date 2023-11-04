@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <sodium.h>
 #include "user.h"
+#include "entries.h"
 
 int main(){
 
@@ -21,6 +22,10 @@ int main(){
     scanf("%d",&choice);
     switch(choice){
         case 1:
+             if (!load_users_from_file()) {
+                    printf("Unable to load user data.\n");
+                    return 1;
+                }
             if (loggedIn == 0) {
                     loggedIn = authenticate_user();
                 } else {
@@ -31,6 +36,10 @@ int main(){
             loggedIn=register_user();
             if (!save_users_to_file()) {
                     printf("Unable to save user data.\n");
+                }
+             if (!load_users_from_file()) {
+                    printf("Unable to load user data.\n");
+                    return 1;
                 }
             break;
         case 3:
